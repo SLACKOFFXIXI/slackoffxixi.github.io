@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>摸鱼连连看 - 喜羊羊与灰太狼</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 20px;
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+        
+        #menuScreen, #gameScreen, #victoryScreen, #gameOverScreen {
+            text-align: center;
+        }
+        
+        #gameScreen, #victoryScreen, #gameOverScreen {
+            display: none;
+        }
+        
+        h1 {
+            color: #4a5568;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #718096;
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+        
+        .level-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+            max-width: 600px;
+        }
+        
+        .level-btn {
+            padding: 15px 10px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .level-btn.unlocked {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+        
+        .level-btn.unlocked:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+        }
+        
+        .level-btn.locked {
+            background: #cbd5e0;
+            color: #718096;
+            cursor: not-allowed;
+        }
+        
+        .level-btn.current {
+            background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+            color: white;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+            color: white;
+        }
+        
+        #gameCanvas {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+        }
+        
+        .game-info span {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4a5568;
+        }
+        
+        .game-info .time {
+            color: #e53e3e;
+        }
+        
+        .victory-message {
+            font-size: 3em;
+            color: #48bb78;
+            margin-bottom: 20px;
+            animation: bounce 1s ease infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        
+        .overlay.active {
+            display: flex;
+        }
+        
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8em; }
+            h2 { font-size: 1.2em; }
+            .level-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            .level-btn {
+                padding: 12px 8px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- 菜单界面 -->
+        <div id="menuScreen">
+            <h1>摸鱼连连看</h1>
+            <h2>喜羊羊与灰太狼</h2>
+            <div class="level-grid" id="levelGrid"></div>
+            <button class="btn btn-danger" onclick="exitGame()">退出游戏</button>
+        </div>
+        
+        <!-- 游戏界面 -->
+        <div id="gameScreen">
+            <div class="game-info">
+                <button class="btn btn-primary" onclick="backToMenu()" style="margin:0;padding:8px 20px;font-size:14px;">返回</button>
+                <span id="levelName">第1关</span>
+                <span>分数: <span id="score">0</span></span>
+                <span class="time">时间: <span id="time">60</span>s</span>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        
+        <!-- 通关界面 -->
+        <div id="victoryScreen" class="overlay">
+            <div class="victory-message">恭喜过关！</div>
+            <p style="font-size: 1.5em; color: #4a5568; margin-bottom: 30px;">太棒了！你完成了这一关！</p>
+            <button class="btn btn-primary" onclick="nextLevel()">下一关</button>
+            <button class="btn btn-primary" onclick="backToMenu()">返回菜单</button>
+        </div>
+        
+        <!-- 游戏结束界面 -->
+        <div id="gameOverScreen" class="overlay">
+            <h1 style="color: #e53e3e; margin-bottom: 20px;">时间到！</h1>
+            <p style="font-size: 1.5em; color: #4a5568; margin-bottom: 30px;">游戏结束，再试一次吧！</p>
+            <button class="btn btn-primary" onclick="retryLevel()">重试本关</button>
+            <button class="btn btn-primary" onclick="backToMenu()">返回菜单</button>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>

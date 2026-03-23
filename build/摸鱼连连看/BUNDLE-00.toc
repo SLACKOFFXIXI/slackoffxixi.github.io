@@ -1,0 +1,3 @@
+([('摸鱼连连看',
+   '/Users/mylove/PycharmProjects/EasyGame/dist/摸鱼连连看',
+   'EXECUTABLE')],)
