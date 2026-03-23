@@ -72,6 +72,33 @@ function initMenu() {
     }
 }
 
+// 计算自适应的格子大小
+function calculateCellSize() {
+    const config = LEVELS[gameState.currentLevel];
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // 预留边距和UI空间
+    const margin = 40;
+    const uiHeight = 120; // 顶部信息栏高度
+    
+    // 计算可用空间
+    const availableWidth = screenWidth - margin;
+    const availableHeight = screenHeight - uiHeight - margin;
+    
+    // 根据棋盘大小和可用空间计算最佳格子大小
+    const cellSizeByWidth = Math.floor(availableWidth / config.cols);
+    const cellSizeByHeight = Math.floor(availableHeight / config.rows);
+    
+    // 取较小值，确保棋盘能完整显示
+    let cellSize = Math.min(cellSizeByWidth, cellSizeByHeight);
+    
+    // 限制最小和最大格子大小
+    cellSize = Math.max(30, Math.min(cellSize, 80));
+    
+    return cellSize;
+}
+
 // 开始关卡
 function startLevel(levelIdx) {
     gameState.currentLevel = levelIdx;
@@ -79,7 +106,7 @@ function startLevel(levelIdx) {
     gameState.rows = config.rows;
     gameState.cols = config.cols;
     gameState.timeLeft = config.time;
-    gameState.cellSize = config.cellSize;
+    gameState.cellSize = calculateCellSize();
     gameState.score = 0;
     gameState.gameOver = false;
     gameState.victory = false;
@@ -91,8 +118,7 @@ function startLevel(levelIdx) {
     initGrid();
     
     // 设置 Canvas 大小
-    canvas.width = gameState.cols * gameState.cellSize + 20;
-    canvas.height = gameState.rows * gameState.cellSize + 20;
+    resizeCanvas();
     
     // 更新界面
     document.getElementById('menuScreen').style.display = 'none';
@@ -112,6 +138,33 @@ function startLevel(levelIdx) {
     // 开始游戏循环
     requestAnimationFrame(gameLoop);
 }
+
+// 调整 Canvas 大小
+function resizeCanvas() {
+    const offsetX = 10;
+    const offsetY = 10;
+    canvas.width = gameState.cols * gameState.cellSize + offsetX * 2;
+    canvas.height = gameState.rows * gameState.cellSize + offsetY * 2;
+    
+    // 确保 Canvas 不超过屏幕宽度
+    const maxWidth = window.innerWidth - 40;
+    if (canvas.width > maxWidth) {
+        const scale = maxWidth / canvas.width;
+        canvas.style.width = maxWidth + 'px';
+        canvas.style.height = (canvas.height * scale) + 'px';
+    } else {
+        canvas.style.width = canvas.width + 'px';
+        canvas.style.height = canvas.height + 'px';
+    }
+}
+
+// 监听屏幕旋转和大小变化
+window.addEventListener('resize', () => {
+    if (gameState.gameState === 'PLAYING' && !gameState.gameOver && !gameState.victory) {
+        gameState.cellSize = calculateCellSize();
+        resizeCanvas();
+    }
+});
 
 // 初始化棋盘
 function initGrid() {
@@ -481,12 +534,19 @@ function canConnectOneCorner(start, end) {
 
 // 两个拐角连接检查
 function canConnectTwoCorners(start, end) {
+    const [r1, c1] = start;
+    const [r2, c2] = end;
+    
+    // 搜索所有可能的中间点（包括棋盘外一圈）
     for (let r = -1; r <= gameState.rows; r++) {
         for (let c = -1; c <= gameState.cols; c++) {
+            // 跳过在棋盘内且被占用的点
             if (inGrid(r, c) && gameState.grid[r][c] !== -1) continue;
             
+            // 检查 start 到中间点是否可以直接连接
             if (!canConnectDirect(start, [r, c])) continue;
             
+            // 检查中间点到 end 是否可以通过一个拐角连接
             const corner = canConnectOneCorner([r, c], end);
             if (corner) {
                 return [[r, c], corner];
