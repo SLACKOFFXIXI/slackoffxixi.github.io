@@ -20,34 +20,44 @@ const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
 let IMAGE_FILES = [];
 let loadedImages = {};
 
-// 动态扫描并加载图片
+// 动态扫描并加载图片（并行加载优化）
 async function scanAndLoadImages() {
     IMAGE_FILES = [];
     loadedImages = {};
     
-    // 尝试加载 images/1/ 文件夹下的图片
-    // 格式: 未命名.png, 未命名 2.png, 未命名 3.png, ...
+    // 生成所有可能的图片路径
+    const possibleImages = [];
     for (let i = 0; i <= 50; i++) {
         for (const ext of IMAGE_EXTENSIONS) {
             const filename = i === 0 ? `未命名${ext}` : `未命名 ${i}${ext}`;
-            // URL 编码文件名（处理空格等特殊字符）
             const encodedFilename = encodeURIComponent(filename);
-            const src = `images/1/${encodedFilename}`;
-            try {
-                const img = await loadImage(src);
-                if (img) {
-                    const index = IMAGE_FILES.length;
-                    IMAGE_FILES.push(src);
-                    loadedImages[index] = img;
-                    break; // 找到一种格式就跳出
-                }
-            } catch (e) {
-                // 图片不存在，继续尝试下一个
-            }
+            possibleImages.push(`images/1/${encodedFilename}`);
         }
     }
     
-    console.log(`成功加载 ${IMAGE_FILES.length} 张图片:`, IMAGE_FILES);
+    console.log('开始并行加载图片...');
+    const startTime = Date.now();
+    
+    // 并行加载所有图片（最多同时加载10张）
+    const batchSize = 10;
+    for (let i = 0; i < possibleImages.length; i += batchSize) {
+        const batch = possibleImages.slice(i, i + batchSize);
+        const results = await Promise.all(batch.map(src => loadImage(src)));
+        
+        results.forEach((img, idx) => {
+            if (img) {
+                const index = IMAGE_FILES.length;
+                IMAGE_FILES.push(batch[idx]);
+                loadedImages[index] = img;
+            }
+        });
+        
+        // 每加载一批就更新进度
+        console.log(`已加载 ${IMAGE_FILES.length} 张图片...`);
+    }
+    
+    const duration = Date.now() - startTime;
+    console.log(`成功加载 ${IMAGE_FILES.length} 张图片，耗时 ${duration}ms`);
     return IMAGE_FILES.length > 0;
 }
 
@@ -71,9 +81,36 @@ function shuffleArray(array) {
     return shuffled;
 }
 
+// 显示加载提示
+function showLoading(message) {
+    const menuScreen = document.getElementById('menuScreen');
+    if (menuScreen) {
+        const existingLoading = menuScreen.querySelector('.loading-message');
+        if (existingLoading) {
+            existingLoading.textContent = message;
+        } else {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading-message';
+            loadingDiv.style.cssText = 'color: #666; font-size: 18px; margin: 20px 0; padding: 20px;';
+            loadingDiv.textContent = message;
+            menuScreen.insertBefore(loadingDiv, menuScreen.firstChild);
+        }
+    }
+}
+
+// 隐藏加载提示
+function hideLoading() {
+    const loadingDiv = document.querySelector('.loading-message');
+    if (loadingDiv) {
+        loadingDiv.remove();
+    }
+}
+
 // 页面加载时扫描图片
 window.addEventListener('load', async () => {
+    showLoading('正在加载图片资源...');
     await scanAndLoadImages();
+    hideLoading();
     // 重新初始化菜单
     initMenu();
 });
