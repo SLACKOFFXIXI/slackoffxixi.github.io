@@ -37,11 +37,11 @@
             max-height: 95vh;
         }
         
-        #menuScreen, #gameScreen, #victoryScreen, #gameOverScreen {
+        #menuScreen, #gameScreen {
             text-align: center;
         }
         
-        #gameScreen, #victoryScreen, #gameOverScreen {
+        #gameScreen {
             display: none;
         }
         
@@ -164,18 +164,30 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255,255,255,0.95);
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: none;
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            z-index: 1000;
+            z-index: 99999;
         }
         
         .overlay.active {
-            display: flex;
+            display: flex !important;
+        }
+        
+        #victoryScreen, #gameOverScreen {
+            position: fixed;
+            text-align: center;
+        }
+        
+        .overlay-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         
         @media (max-width: 600px) {
@@ -246,18 +258,22 @@
             </div>
             <canvas id="gameCanvas"></canvas>
         </div>
-        
-        <!-- 通关界面 -->
-        <div id="victoryScreen" class="overlay">
-            <div class="victory-message">恭喜过关！</div>
+    </div>
+    
+    <!-- 通关界面 -->
+    <div id="victoryScreen" class="overlay">
+        <div class="overlay-content">
+            <div class="victory-message">🎉 恭喜过关！</div>
             <p style="font-size: 1.5em; color: #4a5568; margin-bottom: 30px;">太棒了！你完成了这一关！</p>
             <button class="btn btn-primary" onclick="nextLevel()">下一关</button>
             <button class="btn btn-primary" onclick="backToMenu()">返回菜单</button>
         </div>
-        
-        <!-- 游戏结束界面 -->
-        <div id="gameOverScreen" class="overlay">
-            <h1 style="color: #e53e3e; margin-bottom: 20px;">时间到！</h1>
+    </div>
+    
+    <!-- 游戏结束界面 -->
+    <div id="gameOverScreen" class="overlay">
+        <div class="overlay-content">
+            <h1 style="color: #e53e3e; margin-bottom: 20px;">⏰ 时间到！</h1>
             <p style="font-size: 1.5em; color: #4a5568; margin-bottom: 30px;">游戏结束，再试一次吧！</p>
             <button class="btn btn-primary" onclick="retryLevel()">重试本关</button>
             <button class="btn btn-primary" onclick="backToMenu()">返回菜单</button>

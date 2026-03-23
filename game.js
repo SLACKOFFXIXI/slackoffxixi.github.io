@@ -274,23 +274,47 @@ function shuffleRemainingTiles() {
         }
     }
     
-    // 如果只剩2个方块，它们一定是相同的类型（成对生成），直接放在相邻位置确保可连接
+    console.log('洗牌前剩余方块数:', remaining.length, '位置:', positions);
+    
+    // 如果只剩2个方块，把它们移到相邻位置确保可以直接连接
     if (remaining.length === 2) {
-        // 把两个方块放在同一行的相邻位置，确保可以直接连接
         const [r1, c1] = positions[0];
         const [r2, c2] = positions[1];
-        // 交换位置使它们在同一行且相邻
-        if (r1 !== r2 || Math.abs(c1 - c2) !== 1) {
-            // 把第二个方块移到第一个方块的右边（如果可能）
-            if (c1 + 1 < gameState.cols && gameState.grid[r1][c1 + 1] === -1) {
-                // 需要找到第二个方块当前的位置并交换
-                gameState.grid[r2][c2] = -1;
-                gameState.grid[r1][c1 + 1] = remaining[1];
-            } else if (c1 - 1 >= 0 && gameState.grid[r1][c1 - 1] === -1) {
-                gameState.grid[r2][c2] = -1;
-                gameState.grid[r1][c1 - 1] = remaining[1];
+        
+        console.log('两个方块当前位置:', [r1, c1], [r2, c2]);
+        
+        // 清空当前位置
+        gameState.grid[r1][c1] = -1;
+        gameState.grid[r2][c2] = -1;
+        
+        // 找到第一个空位放置第一个方块
+        for (let row = 0; row < gameState.rows; row++) {
+            for (let col = 0; col < gameState.cols - 1; col++) {
+                if (gameState.grid[row][col] === -1 && gameState.grid[row][col + 1] === -1) {
+                    gameState.grid[row][col] = remaining[0];
+                    gameState.grid[row][col + 1] = remaining[1];
+                    console.log('两个方块已移到水平相邻位置:', [row, col], [row, col + 1]);
+                    return;
+                }
             }
         }
+        
+        // 如果没找到水平相邻的空位，尝试垂直相邻
+        for (let row = 0; row < gameState.rows - 1; row++) {
+            for (let col = 0; col < gameState.cols; col++) {
+                if (gameState.grid[row][col] === -1 && gameState.grid[row + 1][col] === -1) {
+                    gameState.grid[row][col] = remaining[0];
+                    gameState.grid[row + 1][col] = remaining[1];
+                    console.log('两个方块已移到垂直相邻位置:', [row, col], [row + 1, col]);
+                    return;
+                }
+            }
+        }
+        
+        // 如果都没找到，恢复原位置
+        console.log('警告：未找到相邻空位，恢复原位置');
+        gameState.grid[r1][c1] = remaining[0];
+        gameState.grid[r2][c2] = remaining[1];
         return;
     }
     
@@ -559,6 +583,7 @@ canvas.addEventListener('click', (e) => {
     
     if (!gameState.selected) {
         gameState.selected = [row, col];
+        console.log('选中第一个方块:', row, col, '类型:', gameState.grid[row][col]);
     } else {
         const [sr, sc] = gameState.selected;
         
@@ -567,29 +592,20 @@ canvas.addEventListener('click', (e) => {
             return;
         }
         
-        // 检查是否是最后两个方块
-        let remainingCount = 0;
-        for (let r = 0; r < gameState.rows; r++) {
-            for (let c = 0; c < gameState.cols; c++) {
-                if (gameState.grid[r][c] !== -1) remainingCount++;
-            }
-        }
-        
-        // 最后两个方块直接消除（它们一定是相同的类型）
-        if (remainingCount === 2) {
-            gameState.grid[sr][sc] = -1;
-            gameState.grid[row][col] = -1;
-            gameState.score += 10;
-            document.getElementById('score').textContent = gameState.score;
-            gameState.path = [[sr, sc], [row, col]];
-            gameState.pathTimer = 15;
-            victory();
+        // 检查类型是否相同
+        if (gameState.grid[sr][sc] !== gameState.grid[row][col]) {
+            console.log('类型不同，无法消除');
             gameState.selected = null;
             return;
         }
         
+        console.log('查找路径:', [sr, sc], '到', [row, col]);
+        // 查找路径
         const path = findPath([sr, sc], [row, col]);
+        console.log('路径结果:', path);
+        
         if (path) {
+            console.log('消除成功');
             // 消除
             gameState.grid[sr][sc] = -1;
             gameState.grid[row][col] = -1;
@@ -600,13 +616,18 @@ canvas.addEventListener('click', (e) => {
             
             // 检查胜利
             if (checkWin()) {
+                console.log('游戏胜利！');
                 victory();
             } else {
                 // 检查是否还有可连接的方块对，如果没有则重新洗牌
+                console.log('检查是否有可连接的对...');
                 if (!hasValidPair()) {
+                    console.log('没有可连接的对，开始洗牌');
                     shuffleRemainingTiles();
                 }
             }
+        } else {
+            console.log('无法连接，不能消除');
         }
         
         gameState.selected = null;
@@ -741,19 +762,28 @@ function victory() {
         gameState.maxUnlockedLevel = Math.min(10, gameState.currentLevel + 2);
     }
     
+    // 隐藏游戏界面和游戏容器，显示胜利界面
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'none';
     document.getElementById('victoryScreen').classList.add('active');
+    console.log('胜利界面已显示');
 }
 
 // 游戏结束
 function gameOver() {
     gameState.gameOver = true;
     clearInterval(gameState.timerInterval);
+    
+    // 隐藏游戏界面和游戏容器，显示结束界面
+    document.getElementById('gameScreen').style.display = 'none';
+    document.getElementById('gameContainer').style.display = 'none';
     document.getElementById('gameOverScreen').classList.add('active');
 }
 
 // 下一关
 function nextLevel() {
     document.getElementById('victoryScreen').classList.remove('active');
+    document.getElementById('gameContainer').style.display = 'flex';
     if (gameState.currentLevel < 9) {
         startLevel(gameState.currentLevel + 1);
     } else {
@@ -764,6 +794,7 @@ function nextLevel() {
 // 重试本关
 function retryLevel() {
     document.getElementById('gameOverScreen').classList.remove('active');
+    document.getElementById('gameContainer').style.display = 'flex';
     startLevel(gameState.currentLevel);
 }
 
@@ -773,6 +804,7 @@ function backToMenu() {
     document.getElementById('gameScreen').style.display = 'none';
     document.getElementById('victoryScreen').classList.remove('active');
     document.getElementById('gameOverScreen').classList.remove('active');
+    document.getElementById('gameContainer').style.display = 'flex';
     document.getElementById('menuScreen').style.display = 'block';
     initMenu();
 }
