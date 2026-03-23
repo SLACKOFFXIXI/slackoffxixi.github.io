@@ -30,7 +30,9 @@ async function scanAndLoadImages() {
     for (let i = 0; i <= 50; i++) {
         for (const ext of IMAGE_EXTENSIONS) {
             const filename = i === 0 ? `未命名${ext}` : `未命名 ${i}${ext}`;
-            const src = `images/1/${filename}`;
+            // URL 编码文件名（处理空格等特殊字符）
+            const encodedFilename = encodeURIComponent(filename);
+            const src = `images/1/${encodedFilename}`;
             try {
                 const img = await loadImage(src);
                 if (img) {
