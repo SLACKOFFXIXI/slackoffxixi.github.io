@@ -37,6 +37,8 @@ async function scanAndLoadImages() {
     
     console.log('开始并行加载图片...');
     const startTime = Date.now();
+    const totalBatches = Math.ceil(possibleImages.length / 10);
+    let completedBatches = 0;
     
     // 并行加载所有图片（最多同时加载10张）
     const batchSize = 10;
@@ -52,12 +54,17 @@ async function scanAndLoadImages() {
             }
         });
         
-        // 每加载一批就更新进度
-        console.log(`已加载 ${IMAGE_FILES.length} 张图片...`);
+        completedBatches++;
+        updateProgress(completedBatches, totalBatches);
+        console.log(`已加载 ${IMAGE_FILES.length} 张图片... (${completedBatches}/${totalBatches})`);
     }
     
     const duration = Date.now() - startTime;
     console.log(`成功加载 ${IMAGE_FILES.length} 张图片，耗时 ${duration}ms`);
+    
+    // 加载完成后隐藏遮罩
+    hideLoadingOverlay();
+    
     return IMAGE_FILES.length > 0;
 }
 
@@ -81,36 +88,28 @@ function shuffleArray(array) {
     return shuffled;
 }
 
-// 显示加载提示
-function showLoading(message) {
-    const menuScreen = document.getElementById('menuScreen');
-    if (menuScreen) {
-        const existingLoading = menuScreen.querySelector('.loading-message');
-        if (existingLoading) {
-            existingLoading.textContent = message;
-        } else {
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'loading-message';
-            loadingDiv.style.cssText = 'color: #666; font-size: 18px; margin: 20px 0; padding: 20px;';
-            loadingDiv.textContent = message;
-            menuScreen.insertBefore(loadingDiv, menuScreen.firstChild);
-        }
+// 更新进度条
+function updateProgress(loaded, total) {
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    if (progressFill && progressText) {
+        const percentage = Math.round((loaded / total) * 100);
+        progressFill.style.width = percentage + '%';
+        progressText.textContent = percentage + '%';
     }
 }
 
-// 隐藏加载提示
-function hideLoading() {
-    const loadingDiv = document.querySelector('.loading-message');
-    if (loadingDiv) {
-        loadingDiv.remove();
+// 隐藏加载遮罩
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
     }
 }
 
 // 页面加载时扫描图片
 window.addEventListener('load', async () => {
-    showLoading('正在加载图片资源...');
     await scanAndLoadImages();
-    hideLoading();
     // 重新初始化菜单
     initMenu();
 });
