@@ -274,6 +274,26 @@ function shuffleRemainingTiles() {
         }
     }
     
+    // 如果只剩2个方块，它们一定是相同的类型（成对生成），直接放在相邻位置确保可连接
+    if (remaining.length === 2) {
+        // 把两个方块放在同一行的相邻位置，确保可以直接连接
+        const [r1, c1] = positions[0];
+        const [r2, c2] = positions[1];
+        // 交换位置使它们在同一行且相邻
+        if (r1 !== r2 || Math.abs(c1 - c2) !== 1) {
+            // 把第二个方块移到第一个方块的右边（如果可能）
+            if (c1 + 1 < gameState.cols && gameState.grid[r1][c1 + 1] === -1) {
+                // 需要找到第二个方块当前的位置并交换
+                gameState.grid[r2][c2] = -1;
+                gameState.grid[r1][c1 + 1] = remaining[1];
+            } else if (c1 - 1 >= 0 && gameState.grid[r1][c1 - 1] === -1) {
+                gameState.grid[r2][c2] = -1;
+                gameState.grid[r1][c1 - 1] = remaining[1];
+            }
+        }
+        return;
+    }
+    
     // 打乱
     for (let i = remaining.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -286,9 +306,9 @@ function shuffleRemainingTiles() {
         gameState.grid[row][col] = remaining[i];
     }
     
-    // 如果洗牌后仍然没有可连接的，再次洗牌
-    if (!hasValidPair() && remaining.length > 0) {
-        setTimeout(shuffleRemainingTiles, 100);
+    // 如果洗牌后仍然没有可连接的，再次洗牌（最多10次避免死循环）
+    if (!hasValidPair() && remaining.length > 2) {
+        setTimeout(() => shuffleRemainingTiles(), 50);
     }
 }
 
@@ -522,8 +542,11 @@ canvas.addEventListener('click', (e) => {
     if (gameState.gameOver || gameState.victory) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
     
     const offsetX = 10;
     const offsetY = 10;
@@ -540,6 +563,27 @@ canvas.addEventListener('click', (e) => {
         const [sr, sc] = gameState.selected;
         
         if (sr === row && sc === col) {
+            gameState.selected = null;
+            return;
+        }
+        
+        // 检查是否是最后两个方块
+        let remainingCount = 0;
+        for (let r = 0; r < gameState.rows; r++) {
+            for (let c = 0; c < gameState.cols; c++) {
+                if (gameState.grid[r][c] !== -1) remainingCount++;
+            }
+        }
+        
+        // 最后两个方块直接消除（它们一定是相同的类型）
+        if (remainingCount === 2) {
+            gameState.grid[sr][sc] = -1;
+            gameState.grid[row][col] = -1;
+            gameState.score += 10;
+            document.getElementById('score').textContent = gameState.score;
+            gameState.path = [[sr, sc], [row, col]];
+            gameState.pathTimer = 15;
+            victory();
             gameState.selected = null;
             return;
         }
