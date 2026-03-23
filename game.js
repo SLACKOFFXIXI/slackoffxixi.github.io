@@ -424,10 +424,15 @@ function canConnectDirect(start, end) {
     const [r1, c1] = start;
     const [r2, c2] = end;
     
+    // 如果起点或终点在棋盘外，允许直接连接（用于边界外路径）
+    const startInGrid = inGrid(r1, c1);
+    const endInGrid = inGrid(r2, c2);
+    
     if (r1 === r2) {
         const minC = Math.min(c1, c2);
         const maxC = Math.max(c1, c2);
         for (let c = minC + 1; c < maxC; c++) {
+            // 如果该位置在棋盘内且有方块，则不能连接
             if (inGrid(r1, c) && gameState.grid[r1][c] !== -1) return false;
         }
         return true;
@@ -437,6 +442,7 @@ function canConnectDirect(start, end) {
         const minR = Math.min(r1, r2);
         const maxR = Math.max(r1, r2);
         for (let r = minR + 1; r < maxR; r++) {
+            // 如果该位置在棋盘内且有方块，则不能连接
             if (inGrid(r, c1) && gameState.grid[r][c1] !== -1) return false;
         }
         return true;
@@ -450,13 +456,21 @@ function canConnectOneCorner(start, end) {
     const [r1, c1] = start;
     const [r2, c2] = end;
     
+    // 尝试两个拐角点：(r1, c2) 和 (r2, c1)
     const corners = [[r1, c2], [r2, c1]];
     
     for (const [cr, cc] of corners) {
-        const cornerValid = !inGrid(cr, cc) || gameState.grid[cr][cc] === -1 || 
-            (cr === end[0] && cc === end[1]);
-        if (cornerValid) {
-            if (canConnectDirect(start, [cr, cc]) && canConnectDirect([cr, cc], end)) {
+        // 拐角点有效条件：在棋盘外，或在棋盘内且为空，或就是终点本身
+        const cornerInGrid = inGrid(cr, cc);
+        const cornerIsEmpty = !cornerInGrid || gameState.grid[cr][cc] === -1;
+        const cornerIsEnd = (cr === r2 && cc === c2);
+        
+        if (cornerIsEmpty || cornerIsEnd) {
+            // 检查 start -> corner -> end 是否都能直接连接
+            const canStartToCorner = canConnectDirect(start, [cr, cc]);
+            const canCornerToEnd = canConnectDirect([cr, cc], end);
+            
+            if (canStartToCorner && canCornerToEnd) {
                 return [cr, cc];
             }
         }
