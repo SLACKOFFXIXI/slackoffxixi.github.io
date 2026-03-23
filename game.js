@@ -12,18 +12,69 @@ const LEVELS = [
     { name: "第10关 羊狼和平", rows: 10, cols: 16, time: 360, cellSize: 34 },
 ];
 
-// 角色定义
-const CHARACTERS = [
-    { name: "喜羊羊", color: "#87CEEB", hornColor: "#FFD700", feature: "smart" },
-    { name: "美羊羊", color: "#FFB6C1", hornColor: "#FFC0CB", feature: "cute" },
-    { name: "懒羊羊", color: "#FFFFC8", hornColor: "#FFA500", feature: "lazy" },
-    { name: "沸羊羊", color: "#B47850", hornColor: "#8B4513", feature: "strong" },
-    { name: "慢羊羊", color: "#FFFACD", hornColor: "#FFD700", feature: "old" },
-    { name: "暖羊羊", color: "#FFA07A", hornColor: "#FF8C00", feature: "kind" },
-    { name: "灰太狼", color: "#808080", hornColor: "#404040", feature: "wolf" },
-    { name: "红太狼", color: "#FF69B4", hornColor: "#FF1493", feature: "queen" },
-    { name: "小灰灰", color: "#C8C8C8", hornColor: "#646464", feature: "baby" },
-];
+// 图片配置 - 动态加载 images/1 文件夹中的图片
+// 支持的图片格式
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+
+// 预定义可能的图片文件名格式
+let IMAGE_FILES = [];
+let loadedImages = {};
+
+// 动态扫描并加载图片
+async function scanAndLoadImages() {
+    IMAGE_FILES = [];
+    loadedImages = {};
+    
+    // 尝试加载 images/1/ 文件夹下的图片
+    // 格式: 未命名.png, 未命名 2.png, 未命名 3.png, ...
+    for (let i = 0; i <= 50; i++) {
+        for (const ext of IMAGE_EXTENSIONS) {
+            const filename = i === 0 ? `未命名${ext}` : `未命名 ${i}${ext}`;
+            const src = `images/1/${filename}`;
+            try {
+                const img = await loadImage(src);
+                if (img) {
+                    const index = IMAGE_FILES.length;
+                    IMAGE_FILES.push(src);
+                    loadedImages[index] = img;
+                    break; // 找到一种格式就跳出
+                }
+            } catch (e) {
+                // 图片不存在，继续尝试下一个
+            }
+        }
+    }
+    
+    console.log(`成功加载 ${IMAGE_FILES.length} 张图片:`, IMAGE_FILES);
+    return IMAGE_FILES.length > 0;
+}
+
+// 加载单张图片
+function loadImage(src) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+    });
+}
+
+// 打乱数组（Fisher-Yates 算法）
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+// 页面加载时扫描图片
+window.addEventListener('load', async () => {
+    await scanAndLoadImages();
+    // 重新初始化菜单
+    initMenu();
+});
 
 // 游戏状态
 let gameState = {
@@ -192,22 +243,28 @@ function initGrid() {
     const totalCells = gameState.rows * gameState.cols;
     const pairs = totalCells / 2;
     
-    let tiles = [];
-    for (let i = 0; i < pairs; i++) {
-        const tileType = i % CHARACTERS.length;
-        tiles.push(tileType, tileType);
+    // 如果没有图片，使用默认数字
+    if (IMAGE_FILES.length === 0) {
+        console.warn('没有加载到图片，使用默认数字');
     }
+    
+    // 随机选择图片索引并打乱
+    let availableIndices = [];
+    for (let i = 0; i < pairs; i++) {
+        const imageIndex = i % Math.max(IMAGE_FILES.length, 1);
+        availableIndices.push(imageIndex, imageIndex);
+    }
+    
+    // 打乱图片索引
+    availableIndices = shuffleArray(availableIndices);
     
     // 打乱并确保有可解路径
     let attempts = 0;
     let validGrid = false;
     
     while (!validGrid && attempts < 100) {
-        // 打乱
-        for (let i = tiles.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
-        }
+        // 再次打乱
+        availableIndices = shuffleArray(availableIndices);
         
         // 填充棋盘
         gameState.grid = [];
@@ -215,7 +272,7 @@ function initGrid() {
         for (let row = 0; row < gameState.rows; row++) {
             const rowData = [];
             for (let col = 0; col < gameState.cols; col++) {
-                rowData.push(tiles[idx++]);
+                rowData.push(availableIndices[idx++]);
             }
             gameState.grid.push(rowData);
         }
@@ -407,7 +464,6 @@ function draw() {
 
 // 绘制单个方块
 function drawTile(row, col, tileType, selected, offsetX, offsetY) {
-    const char = CHARACTERS[tileType];
     const x = offsetX + col * gameState.cellSize;
     const y = offsetY + row * gameState.cellSize;
     const size = gameState.cellSize - 4;
@@ -422,143 +478,52 @@ function drawTile(row, col, tileType, selected, offsetX, offsetY) {
     ctx.fillStyle = '#646464';
     ctx.fillRect(x, y, size, size);
     
-    // 背景
-    ctx.fillStyle = char.color;
+    // 内框背景
+    ctx.fillStyle = '#f0f0f0';
     ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
     
-    const centerX = x + size / 2;
-    const centerY = y + size / 2;
-    const radius = size / 3;
+    // 获取对应的图片
+    const imageIndex = tileType % IMAGE_FILES.length;
+    const img = loadedImages[imageIndex];
     
-    // 脸部颜色
-    let faceColor = char.color;
-    if (char.feature === 'wolf') faceColor = '#646464';
-    else if (char.feature === 'baby') faceColor = '#DCDCDC';
-    
-    // 绘制脸（圆形）
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.fillStyle = faceColor;
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    
-    // 绘制角
-    ctx.fillStyle = char.hornColor;
-    ctx.beginPath();
-    ctx.ellipse(centerX - radius + 5, centerY - radius, 4, 8, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(centerX + radius - 5, centerY - radius, 4, 8, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // 根据特征绘制
-    switch (char.feature) {
-        case 'cute': // 美羊羊 - 蝴蝶结
-            ctx.fillStyle = '#FF69B4';
-            ctx.beginPath();
-            ctx.ellipse(centerX - 6, centerY - radius - 5, 4, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(centerX + 6, centerY - radius - 5, 4, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(centerX, centerY - radius - 3, 3, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-        case 'lazy': // 懒羊羊 - 便便发型
-            ctx.fillStyle = '#FFC864';
-            ctx.beginPath();
-            ctx.ellipse(centerX, centerY - radius - 8, 8, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(centerX, centerY - radius - 12, 5, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            break;
-        case 'old': // 慢羊羊 - 眼镜和草
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            ctx.ellipse(centerX - 6, centerY - 2, 5, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(centerX + 6, centerY - 2, 5, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(centerX - 1, centerY - 2);
-            ctx.lineTo(centerX + 1, centerY - 2);
-            ctx.stroke();
-            // 草
-            ctx.strokeStyle = '#32CD32';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY - radius);
-            ctx.lineTo(centerX, centerY - radius - 8);
-            ctx.stroke();
-            break;
-        case 'strong': // 沸羊羊 - 粗眉毛
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(centerX - 10, centerY - 8);
-            ctx.lineTo(centerX - 2, centerY - 6);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(centerX + 2, centerY - 6);
-            ctx.lineTo(centerX + 10, centerY - 8);
-            ctx.stroke();
-            break;
-        case 'wolf': // 灰太狼 - 伤疤
-            ctx.strokeStyle = '#502828';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(centerX + 3, centerY - 5);
-            ctx.lineTo(centerX + 10, centerY + 2);
-            ctx.stroke();
-            break;
-        case 'queen': // 红太狼 - 皇冠
-            ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.moveTo(centerX - 8, centerY - radius + 5);
-            ctx.lineTo(centerX - 4, centerY - radius - 5);
-            ctx.lineTo(centerX, centerY - radius + 5);
-            ctx.lineTo(centerX + 4, centerY - radius - 5);
-            ctx.lineTo(centerX + 8, centerY - radius + 5);
-            ctx.closePath();
-            ctx.fill();
-            break;
+    if (img && img.complete) {
+        // 计算图片绘制区域（保持比例，居中显示）
+        const padding = 4;
+        const drawSize = size - padding * 2;
+        const aspectRatio = img.width / img.height;
+        
+        let drawWidth, drawHeight;
+        if (aspectRatio > 1) {
+            drawWidth = drawSize;
+            drawHeight = drawSize / aspectRatio;
+        } else {
+            drawWidth = drawSize * aspectRatio;
+            drawHeight = drawSize;
+        }
+        
+        const drawX = x + (size - drawWidth) / 2;
+        const drawY = y + (size - drawHeight) / 2;
+        
+        // 绘制圆角图片
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x + 2, y + 2, size - 4, size - 4, 4);
+        ctx.clip();
+        ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+        ctx.restore();
+    } else {
+        // 图片未加载完成时显示备用颜色块
+        const colors = ['#87CEEB', '#FFB6C1', '#90EE90', '#FFA07A', '#DDA0DD', '#F0E68C'];
+        ctx.fillStyle = colors[imageIndex % colors.length];
+        ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+        
+        // 显示编号
+        ctx.fillStyle = '#333';
+        ctx.font = `${Math.floor(size / 2)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(imageIndex + 1, x + size / 2, y + size / 2);
     }
-    
-    // 眼睛
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.ellipse(centerX - 5, centerY, 4, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(centerX + 5, centerY, 4, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.fillStyle = (char.feature === 'wolf' || char.feature === 'baby') ? '#FFFFFF' : '#000000';
-    ctx.beginPath();
-    ctx.arc(centerX - 5, centerY + 1, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(centerX + 5, centerY + 1, 2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // 鼻子和嘴巴
-    ctx.fillStyle = '#FF9696';
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY + 6, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY + 8, 6, 0.2, Math.PI - 0.2);
-    ctx.stroke();
 }
 
 // 处理点击事件

@@ -1,6 +1,7 @@
 import pygame
 import random
 import sys
+import os
 from typing import List, Tuple, Optional
 
 # 初始化 Pygame
@@ -23,18 +24,28 @@ BLUE = (100, 150, 255)
 ORANGE = (255, 180, 100)
 PURPLE = (180, 100, 200)
 
-# 角色定义（包含名称、主色调、特征）
-CHARACTERS = [
-    {"name": "喜羊羊", "color": (135, 206, 250), "horn_color": (255, 215, 0), "feature": "smart"},
-    {"name": "美羊羊", "color": (255, 182, 193), "horn_color": (255, 192, 203), "feature": "cute"},
-    {"name": "懒羊羊", "color": (255, 255, 200), "horn_color": (255, 165, 0), "feature": "lazy"},
-    {"name": "沸羊羊", "color": (180, 120, 80), "horn_color": (139, 69, 19), "feature": "strong"},
-    {"name": "慢羊羊", "color": (255, 250, 205), "horn_color": (255, 215, 0), "feature": "old"},
-    {"name": "暖羊羊", "color": (255, 160, 122), "horn_color": (255, 140, 0), "feature": "kind"},
-    {"name": "灰太狼", "color": (128, 128, 128), "horn_color": (64, 64, 64), "feature": "wolf"},
-    {"name": "红太狼", "color": (255, 105, 180), "horn_color": (255, 20, 147), "feature": "queen"},
-    {"name": "小灰灰", "color": (200, 200, 200), "horn_color": (100, 100, 100), "feature": "baby"},
-]
+# 图片文件夹路径
+IMAGES_DIR = "images"
+
+# 加载图片文件列表
+def load_image_files():
+    """加载images文件夹中的所有图片文件"""
+    image_files = []
+    if os.path.exists(IMAGES_DIR):
+        for filename in os.listdir(IMAGES_DIR):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                image_files.append(os.path.join(IMAGES_DIR, filename))
+    return image_files
+
+# 加载并缩放图片
+def load_and_scale_image(image_path, size):
+    """加载图片并缩放到指定大小"""
+    try:
+        image = pygame.image.load(image_path)
+        return pygame.transform.smoothscale(image, (size, size))
+    except Exception as e:
+        print(f"加载图片失败 {image_path}: {e}")
+        return None
 
 # 关卡配置：行数、列数、时间限制(秒)
 LEVELS = [
@@ -88,6 +99,10 @@ class LianLianKanGame:
         self.title_font = pygame.font.SysFont(font_name, 72)
         self.small_font = pygame.font.SysFont(font_name, 18)
         
+        # 加载图片
+        self.image_files = load_image_files()
+        self.tile_images = {}  # 缓存不同大小的图片
+        
         # 游戏状态
         self.grid: List[List[int]] = []
         self.selected: Optional[Tuple[int, int]] = None
@@ -111,6 +126,19 @@ class LianLianKanGame:
         # 通关提示
         self.show_victory = False
         self.victory_timer = 0
+    
+    def get_tile_image(self, tile_type, size):
+        """获取指定类型和大小的图片"""
+        cache_key = (tile_type, size)
+        if cache_key not in self.tile_images:
+            if self.image_files:
+                # 使用实际图片，循环使用
+                image_path = self.image_files[tile_type % len(self.image_files)]
+                image = load_and_scale_image(image_path, size - 8)  # 留一些边距
+                self.tile_images[cache_key] = image
+            else:
+                self.tile_images[cache_key] = None
+        return self.tile_images[cache_key]
     
     def init_level(self, level_idx: int):
         """初始化指定关卡"""
@@ -178,83 +206,29 @@ class LianLianKanGame:
     def draw_tile(self, row: int, col: int, tile_type: int, selected: bool = False):
         """绘制一个角色头像"""
         rect = self.get_cell_rect(row, col)
-        char = CHARACTERS[tile_type % len(CHARACTERS)]
         
         if selected:
             pygame.draw.rect(self.screen, YELLOW, rect.inflate(6, 6), border_radius=10)
         
         pygame.draw.rect(self.screen, DARK_GRAY, rect, border_radius=8)
         inner_rect = rect.inflate(-4, -4)
-        pygame.draw.rect(self.screen, char["color"], inner_rect, border_radius=6)
         
-        center_x, center_y = rect.center
-        radius = rect.width // 3
+        # 尝试加载图片
+        image = self.get_tile_image(tile_type, self.cell_size)
         
-        face_color = char["color"]
-        if char["feature"] == "wolf":
-            face_color = (100, 100, 100)
-        elif char["feature"] == "baby":
-            face_color = (220, 220, 220)
-        
-        pygame.draw.circle(self.screen, face_color, (center_x, center_y), radius)
-        pygame.draw.circle(self.screen, BLACK, (center_x, center_y), radius, 2)
-        
-        horn_color = char["horn_color"]
-        horn_width = max(4, self.cell_size // 15)
-        horn_height = max(8, self.cell_size // 8)
-        pygame.draw.ellipse(self.screen, horn_color, 
-                           (center_x - radius - 2, center_y - radius - 5, horn_width, horn_height))
-        pygame.draw.ellipse(self.screen, horn_color,
-                           (center_x + radius - 4, center_y - radius - 5, horn_width, horn_height))
-        
-        if char["feature"] == "cute":
-            bow_color = (255, 105, 180)
-            pygame.draw.ellipse(self.screen, bow_color, (center_x - 8, center_y - radius - 8, 6, 8))
-            pygame.draw.ellipse(self.screen, bow_color, (center_x + 2, center_y - radius - 8, 6, 8))
-            pygame.draw.circle(self.screen, bow_color, (center_x, center_y - radius - 4), 3)
-        elif char["feature"] == "lazy":
-            hair_color = (255, 200, 100)
-            pygame.draw.ellipse(self.screen, hair_color, (center_x - 6, center_y - radius - 10, 12, 10))
-            pygame.draw.ellipse(self.screen, hair_color, (center_x - 4, center_y - radius - 14, 8, 8))
-        elif char["feature"] == "old":
-            pygame.draw.ellipse(self.screen, WHITE, (center_x - 10, center_y - 5, 8, 6))
-            pygame.draw.ellipse(self.screen, WHITE, (center_x + 2, center_y - 5, 8, 6))
-            pygame.draw.line(self.screen, BLACK, (center_x - 2, center_y - 2), (center_x + 2, center_y - 2), 2)
-            pygame.draw.line(self.screen, (50, 150, 50), (center_x, center_y - radius), (center_x, center_y - radius - 8), 3)
-            pygame.draw.ellipse(self.screen, (100, 200, 100), (center_x - 3, center_y - radius - 12, 6, 6))
-        elif char["feature"] == "strong":
-            pygame.draw.line(self.screen, BLACK, (center_x - 10, center_y - 8), (center_x - 2, center_y - 6), 3)
-            pygame.draw.line(self.screen, BLACK, (center_x + 2, center_y - 6), (center_x + 10, center_y - 8), 3)
-        elif char["feature"] == "wolf":
-            pygame.draw.line(self.screen, (80, 40, 40), (center_x + 5, center_y - 5), (center_x + 12, center_y + 3), 2)
-            pygame.draw.polygon(self.screen, (100, 100, 100), 
-                              [(center_x - radius + 5, center_y - radius + 5),
-                               (center_x - radius - 5, center_y - radius - 10),
-                               (center_x - radius + 10, center_y - radius)])
-            pygame.draw.polygon(self.screen, (100, 100, 100),
-                              [(center_x + radius - 5, center_y - radius + 5),
-                               (center_x + radius + 5, center_y - radius - 10),
-                               (center_x + radius - 10, center_y - radius)])
-        elif char["feature"] == "queen":
-            crown_color = (255, 215, 0)
-            pygame.draw.polygon(self.screen, crown_color,
-                              [(center_x - 8, center_y - radius + 2),
-                               (center_x - 4, center_y - radius - 8),
-                               (center_x, center_y - radius + 2),
-                               (center_x + 4, center_y - radius - 8),
-                               (center_x + 8, center_y - radius + 2)])
-        
-        eye_color = BLACK
-        if char["feature"] in ["wolf", "baby"]:
-            eye_color = WHITE
-        
-        pygame.draw.ellipse(self.screen, WHITE, (center_x - 8, center_y - 3, 6, 8))
-        pygame.draw.circle(self.screen, eye_color, (center_x - 5, center_y + 1), 2)
-        pygame.draw.ellipse(self.screen, WHITE, (center_x + 2, center_y - 3, 6, 8))
-        pygame.draw.circle(self.screen, eye_color, (center_x + 5, center_y + 1), 2)
-        
-        pygame.draw.ellipse(self.screen, (255, 150, 150), (center_x - 3, center_y + 5, 6, 4))
-        pygame.draw.arc(self.screen, BLACK, (center_x - 6, center_y + 6, 12, 8), 0.2, 2.9, 1)
+        if image:
+            # 使用真实图片
+            image_rect = image.get_rect(center=inner_rect.center)
+            self.screen.blit(image, image_rect)
+        else:
+            # 备用：绘制简单的彩色方块
+            colors = [BLUE, GREEN, RED, ORANGE, PURPLE, (255, 100, 100), (100, 255, 100), (100, 100, 255)]
+            color = colors[tile_type % len(colors)]
+            pygame.draw.rect(self.screen, color, inner_rect, border_radius=6)
+            # 绘制类型编号
+            text = self.small_font.render(str(tile_type + 1), True, WHITE)
+            text_rect = text.get_rect(center=inner_rect.center)
+            self.screen.blit(text, text_rect)
     
     def draw_path_line(self):
         """绘制连接路径"""
