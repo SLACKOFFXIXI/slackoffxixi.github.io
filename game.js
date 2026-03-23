@@ -72,15 +72,23 @@ function initMenu() {
     }
 }
 
+// 检测是否是微信浏览器
+function isWeChat() {
+    return /MicroMessenger/i.test(navigator.userAgent);
+}
+
 // 计算自适应的格子大小
 function calculateCellSize() {
     const config = LEVELS[gameState.currentLevel];
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
     
-    // 预留边距和UI空间
-    const margin = 40;
-    const uiHeight = 120; // 顶部信息栏高度
+    // 获取可视区域大小（兼容微信浏览器）
+    const screenWidth = Math.min(window.innerWidth, window.screen.availWidth || window.innerWidth);
+    const screenHeight = Math.min(window.innerHeight, window.screen.availHeight || window.innerHeight);
+    
+    // 微信浏览器需要额外预留空间
+    const isWX = isWeChat();
+    const margin = isWX ? 20 : 40;
+    const uiHeight = isWX ? 100 : 120; // 顶部信息栏高度
     
     // 计算可用空间
     const availableWidth = screenWidth - margin;
@@ -93,8 +101,9 @@ function calculateCellSize() {
     // 取较小值，确保棋盘能完整显示
     let cellSize = Math.min(cellSizeByWidth, cellSizeByHeight);
     
-    // 限制最小和最大格子大小
-    cellSize = Math.max(30, Math.min(cellSize, 80));
+    // 微信浏览器中限制最大格子大小，避免超出屏幕
+    const maxCellSize = isWX ? 60 : 80;
+    cellSize = Math.max(30, Math.min(cellSize, maxCellSize));
     
     return cellSize;
 }
@@ -143,11 +152,15 @@ function startLevel(levelIdx) {
 function resizeCanvas() {
     const offsetX = 10;
     const offsetY = 10;
+    const isWX = isWeChat();
+    
     canvas.width = gameState.cols * gameState.cellSize + offsetX * 2;
     canvas.height = gameState.rows * gameState.cellSize + offsetY * 2;
     
     // 确保 Canvas 不超过屏幕宽度
-    const maxWidth = window.innerWidth - 40;
+    const margin = isWX ? 10 : 40;
+    const maxWidth = Math.min(window.innerWidth, window.screen.availWidth || window.innerWidth) - margin;
+    
     if (canvas.width > maxWidth) {
         const scale = maxWidth / canvas.width;
         canvas.style.width = maxWidth + 'px';
@@ -155,6 +168,14 @@ function resizeCanvas() {
     } else {
         canvas.style.width = canvas.width + 'px';
         canvas.style.height = canvas.height + 'px';
+    }
+    
+    // 微信浏览器中禁用页面滚动和缩放
+    if (isWX) {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
     }
 }
 
