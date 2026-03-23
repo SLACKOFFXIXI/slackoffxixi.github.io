@@ -198,21 +198,97 @@ function initGrid() {
         tiles.push(tileType, tileType);
     }
     
-    // 打乱
-    for (let i = tiles.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+    // 打乱并确保有可解路径
+    let attempts = 0;
+    let validGrid = false;
+    
+    while (!validGrid && attempts < 100) {
+        // 打乱
+        for (let i = tiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+        }
+        
+        // 填充棋盘
+        gameState.grid = [];
+        let idx = 0;
+        for (let row = 0; row < gameState.rows; row++) {
+            const rowData = [];
+            for (let col = 0; col < gameState.cols; col++) {
+                rowData.push(tiles[idx++]);
+            }
+            gameState.grid.push(rowData);
+        }
+        
+        // 检查是否有至少一对可连接的方块
+        if (hasValidPair()) {
+            validGrid = true;
+        }
+        attempts++;
+    }
+}
+
+// 检查棋盘上是否存在至少一对可连接的方块
+function hasValidPair() {
+    const positions = [];
+    
+    // 收集所有方块的位置
+    for (let row = 0; row < gameState.rows; row++) {
+        for (let col = 0; col < gameState.cols; col++) {
+            if (gameState.grid[row][col] !== -1) {
+                positions.push([row, col, gameState.grid[row][col]]);
+            }
+        }
     }
     
-    // 填充棋盘
-    gameState.grid = [];
-    let idx = 0;
-    for (let row = 0; row < gameState.rows; row++) {
-        const rowData = [];
-        for (let col = 0; col < gameState.cols; col++) {
-            rowData.push(tiles[idx++]);
+    // 检查每一对相同类型的方块是否可以连接
+    for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+            const [r1, c1, type1] = positions[i];
+            const [r2, c2, type2] = positions[j];
+            
+            if (type1 === type2) {
+                const path = findPath([r1, c1], [r2, c2]);
+                if (path) {
+                    return true;
+                }
+            }
         }
-        gameState.grid.push(rowData);
+    }
+    
+    return false;
+}
+
+// 重新洗牌剩余方块
+function shuffleRemainingTiles() {
+    // 收集所有剩余方块
+    const remaining = [];
+    const positions = [];
+    
+    for (let row = 0; row < gameState.rows; row++) {
+        for (let col = 0; col < gameState.cols; col++) {
+            if (gameState.grid[row][col] !== -1) {
+                remaining.push(gameState.grid[row][col]);
+                positions.push([row, col]);
+            }
+        }
+    }
+    
+    // 打乱
+    for (let i = remaining.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+    }
+    
+    // 重新放置
+    for (let i = 0; i < positions.length; i++) {
+        const [row, col] = positions[i];
+        gameState.grid[row][col] = remaining[i];
+    }
+    
+    // 如果洗牌后仍然没有可连接的，再次洗牌
+    if (!hasValidPair() && remaining.length > 0) {
+        setTimeout(shuffleRemainingTiles, 100);
     }
 }
 
@@ -481,6 +557,11 @@ canvas.addEventListener('click', (e) => {
             // 检查胜利
             if (checkWin()) {
                 victory();
+            } else {
+                // 检查是否还有可连接的方块对，如果没有则重新洗牌
+                if (!hasValidPair()) {
+                    shuffleRemainingTiles();
+                }
             }
         }
         
